@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bing-search-cli"
+version = "0.1.0"
+description = "Interactive CLI for Bing Web Search with Azure OpenAI summaries."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [
+  { name = "cchenx7" }
+]
+dependencies = [
+  "requests>=2.32.0",
+  "openai>=1.40.0",
+  "azure-identity>=1.16.0",
+  "azure-ai-projects>=1.0.0b1"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0"
+]
+
+[project.scripts]
+bing-search-cli = "bing_search_cli.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
