@@ -24,3 +24,6 @@ docs/internal/
 .vscode/
 .idea/
 .claude/
+
+# Private scripts
+start.sh
