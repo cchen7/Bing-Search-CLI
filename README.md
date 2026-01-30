@@ -16,27 +16,52 @@ Interactive command-line interface for Bing Search with AI summaries, powered by
 
 ## Installation
 
+### Option A: Local Installation (Isolated)
+
+Install in a local directory with its own virtual environment. Recommended for trying out or development.
+
+```bash
+# Clone to local directory
+git clone https://github.com/cchen7/Bing-Search-CLI.git
+cd Bing-Search-CLI
+
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -e .
+```
+
+Run from the project directory:
+```bash
+source .venv/bin/activate
+python -m bing_search_cli
+```
+
+### Option B: Global Installation
+
+Install system-wide, available from anywhere.
+
 ```bash
 pip install git+https://github.com/cchen7/Bing-Search-CLI.git
 ```
 
-Or install from source:
-
+Run from anywhere:
 ```bash
-git clone https://github.com/cchen7/Bing-Search-CLI.git
-cd Bing-Search-CLI
-pip install -e .
+bing-search-cli
 ```
 
 ## Quick Start
 
 ```bash
-# Set credentials
+# Set credentials (required)
 export AI_PROJECT_ENDPOINT="https://<account>.services.ai.azure.com/api/projects/<project>"
 export AI_PROJECT_CONNECTION_ID="/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>/connections/bing-grounding"
 
 # Run interactive mode
-bing-search-cli
+bing-search-cli                    # Global install
+python -m bing_search_cli          # Local install
 
 # Or run a single query
 bing-search-cli --query "What's the latest price of $NVDA"
