@@ -28,7 +28,7 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install .
 ```
 
-Run from the project directory:
+Run:
 ```bash
 source .venv/bin/activate
 bing-search-cli
