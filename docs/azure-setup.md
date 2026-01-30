@@ -1,99 +1,25 @@
 # Azure Setup Guide
 
-This guide covers how to provision Azure resources for Bing Search CLI.
+This guide covers how to provision Azure AI Foundry resources for Bing Search CLI.
 
-## Authentication Methods
+## Overview
 
-### API Key Authentication
+Bing Search CLI uses Azure AI Foundry's Grounding with Bing capability. This requires:
 
-Use an API key from **Resource Management > Keys and Endpoint** in the Azure Portal.
+1. A Bing Grounding resource (`Microsoft.Bing/accounts`)
+2. An AI Services account with a deployed model
+3. An AI Foundry project with a Bing connection
 
-```python
-client = AzureOpenAI(
-    api_key="YOUR_API_KEY_HERE",
-    azure_endpoint="https://your-resource.openai.azure.com/",
-    api_version="2024-02-15-preview"
-)
-```
+## Authentication
 
-**Pros**: Simple, works anywhere.
-**Cons**: Static secrets, manual rotation, no audit trail.
+The CLI uses RBAC authentication via `DefaultAzureCredential`. Run `az login` locally or use Managed Identity in Azure.
 
-### RBAC Authentication (Microsoft Entra ID)
+Required role: **Cognitive Services OpenAI User** on the AI Services account.
 
-Assign **Cognitive Services OpenAI User** role in IAM and authenticate via `az login` locally or Managed Identity in Azure.
-
-```python
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-
-token_provider = get_bearer_token_provider(
-    DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"
-)
-
-client = AzureOpenAI(
-    azure_ad_token_provider=token_provider,
-    azure_endpoint="https://your-resource.openai.azure.com/",
-    api_version="2024-02-15-preview"
-)
-```
-
-**Pros**: No secrets, auto-rotation, auditing.
-**Cons**: More setup complexity.
-
----
-
-## Option 1: Bing Web Search v7 + Azure OpenAI
-
-This is the legacy approach using separate Bing Search and Azure OpenAI resources.
-
-### Provision Resources
+## Provision Resources
 
 ```bash
-az login
-
-RG=rg-bing-search-cli
-LOCATION=eastus2
-AOAI_NAME=<azure-openai-resource-name>
-DEPLOYMENT_NAME=gpt-4o-mini
-
-az group create -n $RG -l $LOCATION
-
-# Create Azure OpenAI resource
-az cognitiveservices account create \
-  -g $RG -n $AOAI_NAME -l $LOCATION \
-  --kind OpenAI --sku S0 --yes
-
-# Get endpoint
-az cognitiveservices account show -g $RG -n $AOAI_NAME --query properties.endpoint -o tsv
-
-# Deploy model
-az cognitiveservices account deployment create \
-  -g $RG -n $AOAI_NAME \
-  --deployment-name $DEPLOYMENT_NAME \
-  --model-name gpt-4o-mini \
-  --model-version 2024-07-18 \
-  --model-format OpenAI
-```
-
-### Required Environment Variables
-
-```bash
-export BING_API_KEY="your-bing-api-key"
-export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
-export AZURE_OPENAI_DEPLOYMENT="gpt-4o-mini"
-# Optional: use API key instead of RBAC
-export AZURE_OPENAI_API_KEY="your-openai-api-key"
-```
-
----
-
-## Option 2: Azure AI Foundry Grounding with Bing
-
-This approach uses Azure AI Foundry's integrated Bing grounding capability.
-
-### Provision Resources
-
-```bash
+# Variables
 RG=rg-bing-grounding
 LOCATION=eastus2
 AI_SERVICES_NAME=<ai-services-name>
@@ -173,12 +99,10 @@ az rest --method PUT \
 
 # Assign RBAC role
 USER_ID=$(az ad signed-in-user show --query id -o tsv)
-RESOURCE_ID=$(az cognitiveservices account show -g $RG -n $AI_SERVICES_NAME --query id -o tsv)
-
 az role assignment create \
   --assignee $USER_ID \
   --role "Cognitive Services OpenAI User" \
-  --scope $RESOURCE_ID
+  --scope $AI_SERVICES_ID
 
 # Get project endpoint
 az rest --method GET \
@@ -186,22 +110,47 @@ az rest --method GET \
   --query "properties.endpoints.\"AI Foundry API\"" -o tsv
 ```
 
-### Required Environment Variables
+## Get Configuration Values
+
+After provisioning, get the values needed for environment variables:
 
 ```bash
-export SEARCH_PROVIDER="grounding"
+# Project endpoint
+AI_PROJECT_ENDPOINT=$(az rest --method GET \
+  --url "${AI_SERVICES_ID}/projects/${PROJECT_NAME}?api-version=2025-04-01-preview" \
+  --query "properties.endpoints.\"AI Foundry API\"" -o tsv)
+
+# Connection ID
+AI_PROJECT_CONNECTION_ID="${AI_SERVICES_ID}/projects/${PROJECT_NAME}/connections/bing-grounding"
+
+echo "AI_PROJECT_ENDPOINT=${AI_PROJECT_ENDPOINT}"
+echo "AI_PROJECT_CONNECTION_ID=${AI_PROJECT_CONNECTION_ID}"
+echo "AI_PROJECT_MODEL_DEPLOYMENT=${MODEL_DEPLOYMENT}"
+```
+
+## Environment Variables
+
+Set these in your shell or `.env` file:
+
+```bash
 export AI_PROJECT_ENDPOINT="https://<account>.services.ai.azure.com/api/projects/<project>"
 export AI_PROJECT_CONNECTION_ID="/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>/connections/bing-grounding"
 export AI_PROJECT_MODEL_DEPLOYMENT="gpt-4o-mini"
 ```
 
----
-
 ## Troubleshooting
 
 | Error | Solution |
 |-------|----------|
-| 401/403 errors | Check API key, RBAC role assignment, and endpoint URL |
-| No results | Confirm Bing Search resource region and key |
-| Azure OpenAI errors | Ensure deployment name matches config |
-| Network timeouts | Retry and check corporate proxy settings |
+| 401/403 errors | Wait for RBAC propagation (few minutes) or check role assignment |
+| `Unsupported configuration` | Run `az cognitiveservices account identity assign` on the account |
+| `404 Resource not found` | Use the **project** endpoint, not the account endpoint |
+| `Invalid tool value: bing_grounding` | Connection must be on the **project**, not the account |
+
+## Cleanup
+
+To delete all resources:
+
+```bash
+az group delete -n $RG --yes --no-wait
+```

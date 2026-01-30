@@ -13,13 +13,6 @@ HISTORY_PATH = CONFIG_DIR / "history.jsonl"
 
 @dataclass
 class Config:
-    bing_api_key: str | None = None
-    bing_endpoint: str = "https://api.bing.microsoft.com/v7.0/search"
-    search_provider: str = "bing_web"
-    azure_openai_endpoint: str | None = None
-    azure_openai_api_version: str = "2024-02-15-preview"
-    azure_openai_deployment: str = "gpt-4o-mini"
-    azure_openai_api_key: str | None = None
     ai_project_endpoint: str | None = None
     ai_project_connection_id: str | None = None
     ai_project_model_deployment: str = "gpt-4o-mini"
@@ -34,13 +27,6 @@ class Config:
 
 
 ENV_MAP = {
-    "BING_API_KEY": "bing_api_key",
-    "BING_ENDPOINT": "bing_endpoint",
-    "SEARCH_PROVIDER": "search_provider",
-    "AZURE_OPENAI_ENDPOINT": "azure_openai_endpoint",
-    "AZURE_OPENAI_API_VERSION": "azure_openai_api_version",
-    "AZURE_OPENAI_DEPLOYMENT": "azure_openai_deployment",
-    "AZURE_OPENAI_API_KEY": "azure_openai_api_key",
     "AI_PROJECT_ENDPOINT": "ai_project_endpoint",
     "AI_PROJECT_CONNECTION_ID": "ai_project_connection_id",
     "AI_PROJECT_MODEL_DEPLOYMENT": "ai_project_model_deployment",
@@ -118,15 +104,8 @@ def redact(value: str | None) -> str:
 def format_config(config: Config) -> str:
     return (
         "Current configuration:\n"
-        f"  bing_api_key: {redact(config.bing_api_key)}\n"
-        f"  bing_endpoint: {config.bing_endpoint}\n"
-        f"  search_provider: {config.search_provider}\n"
-        f"  azure_openai_endpoint: {config.azure_openai_endpoint or ''}\n"
-        f"  azure_openai_api_version: {config.azure_openai_api_version}\n"
-        f"  azure_openai_deployment: {config.azure_openai_deployment}\n"
-        f"  azure_openai_api_key: {redact(config.azure_openai_api_key)}\n"
         f"  ai_project_endpoint: {config.ai_project_endpoint or ''}\n"
-        f"  ai_project_connection_id: {config.ai_project_connection_id or ''}\n"
+        f"  ai_project_connection_id: {redact(config.ai_project_connection_id)}\n"
         f"  ai_project_model_deployment: {config.ai_project_model_deployment}\n"
         f"  log_level: {config.log_level}\n"
         f"  sdk_log_level: {config.sdk_log_level}\n"

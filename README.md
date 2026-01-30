@@ -1,19 +1,18 @@
 # Bing Search CLI
 
-Interactive command-line interface for Bing Web Search with Azure OpenAI summaries.
+Interactive command-line interface for Bing Search with AI summaries, powered by Azure AI Foundry Grounding.
 
 ## Features
 
 - Interactive terminal prompt with slash commands
-- Two search providers: Bing Web Search v7 or Azure AI Foundry Grounding
-- AI-powered summaries with citations
-- Local history storage in `~/.bing-search-cli`
+- AI-powered summaries with citations via Azure AI Foundry
 - Streaming output support
+- Local history storage in `~/.bing-search-cli`
 
 ## Prerequisites
 
 - Python 3.10+
-- Azure resources (see [Azure Setup Guide](docs/azure-setup.md))
+- Azure AI Foundry project with Bing Grounding connection (see [Azure Setup Guide](docs/azure-setup.md))
 
 ## Installation
 
@@ -32,10 +31,9 @@ pip install -e .
 ## Quick Start
 
 ```bash
-# Set credentials (see Configuration for details)
-export SEARCH_PROVIDER="grounding"
-export AI_PROJECT_ENDPOINT="https://..."
-export AI_PROJECT_CONNECTION_ID="/subscriptions/..."
+# Set credentials
+export AI_PROJECT_ENDPOINT="https://<account>.services.ai.azure.com/api/projects/<project>"
+export AI_PROJECT_CONNECTION_ID="/subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.CognitiveServices/accounts/<account>/projects/<project>/connections/bing-grounding"
 
 # Run interactive mode
 bing-search-cli
@@ -48,41 +46,20 @@ bing-search-cli --query "What's the latest price of $NVDA"
 
 Configure via environment variables or the `/config` command.
 
-### Search Providers
-
-| Provider | Description |
-|----------|-------------|
-| `bing_web` | Bing Web Search v7 + Azure OpenAI summarizer |
-| `grounding` | Azure AI Foundry Grounding with Bing |
-
-Set provider: `export SEARCH_PROVIDER="grounding"`
-
 ### Environment Variables
 
-#### Core Settings
+#### Required
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `SEARCH_PROVIDER` | No | `bing_web` | Search provider: `bing_web` or `grounding` |
+| Variable | Description |
+|----------|-------------|
+| `AI_PROJECT_ENDPOINT` | Azure AI Foundry project endpoint URL |
+| `AI_PROJECT_CONNECTION_ID` | Full resource ID of Bing grounding connection |
 
-#### Bing Web Search Provider (`bing_web`)
+#### Optional
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `BING_API_KEY` | Yes | - | API key from Bing Search resource |
-| `BING_ENDPOINT` | No | `https://api.bing.microsoft.com/v7.0/search` | Bing Search API endpoint |
-| `AZURE_OPENAI_ENDPOINT` | Yes | - | Azure OpenAI resource endpoint |
-| `AZURE_OPENAI_DEPLOYMENT` | No | `gpt-4o-mini` | Model deployment name |
-| `AZURE_OPENAI_API_VERSION` | No | `2024-02-15-preview` | API version |
-| `AZURE_OPENAI_API_KEY` | No | - | API key (if not using RBAC auth) |
-
-#### AI Foundry Grounding Provider (`grounding`)
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `AI_PROJECT_ENDPOINT` | Yes | - | AI Foundry project endpoint URL |
-| `AI_PROJECT_CONNECTION_ID` | Yes | - | Full resource ID of Bing connection |
-| `AI_PROJECT_MODEL_DEPLOYMENT` | No | `gpt-4o-mini` | Model deployment name |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AI_PROJECT_MODEL_DEPLOYMENT` | `gpt-4o-mini` | Model deployment name |
 
 #### Logging & Debug
 
@@ -96,9 +73,9 @@ Set provider: `export SEARCH_PROVIDER="grounding"`
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `BSC_PREWARM` | `true` | Pre-initialize grounding session on startup |
-| `BSC_STREAM` | `true` | Stream output for grounding queries |
-| `BSC_WARMUP` | `true` | Run warmup request on startup to reduce first-query latency |
+| `BSC_PREWARM` | `true` | Pre-initialize session on startup |
+| `BSC_STREAM` | `true` | Stream output for queries |
+| `BSC_WARMUP` | `true` | Run warmup request to reduce first-query latency |
 | `BSC_WARMUP_DELAY_MS` | `1200` | Delay (ms) before warmup request |
 | `BSC_WARMUP_PROMPT` | `OK` | Prompt text for warmup request |
 
@@ -151,9 +128,9 @@ See [Azure Setup Guide](docs/azure-setup.md) for detailed instructions on provis
 
 | Problem | Solution |
 |---------|----------|
-| 401/403 errors | Check API key or RBAC role assignment |
-| No results | Verify Bing Search resource and API key |
-| Model errors | Ensure deployment name matches `*_DEPLOYMENT` variable |
+| 401/403 errors | Check RBAC role assignment (`Cognitive Services OpenAI User`) |
+| Connection errors | Verify `AI_PROJECT_ENDPOINT` and `AI_PROJECT_CONNECTION_ID` |
+| Model errors | Ensure deployment name matches `AI_PROJECT_MODEL_DEPLOYMENT` |
 | Slow first query | Enable `BSC_PREWARM=true` and `BSC_WARMUP=true` |
 
 ## License

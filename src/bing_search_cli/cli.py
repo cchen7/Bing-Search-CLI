@@ -12,10 +12,8 @@ from pathlib import Path
 import shutil
 from typing import Dict, List, Optional
 
-from .bing import BingSearchError, search_web
 from .config import Config, format_config, load_config, save_config, update_config
 from .storage import append_history, load_history, now_iso
-from .summary import SummaryError, summarize
 from .grounding import GroundingError, grounding_answer
 
 BANNER = (
@@ -52,11 +50,7 @@ def setup_logging(level: str, sdk_level: str) -> None:
 
 
 def print_banner(config: Config) -> None:
-    provider = (config.search_provider or "bing_web").lower()
-    if provider == "grounding":
-        model_label = config.ai_project_model_deployment or "unknown"
-    else:
-        model_label = config.azure_openai_deployment or "unknown"
+    model_label = config.ai_project_model_deployment or "unknown"
     print(BANNER.format(model=model_label))
 
 
@@ -70,10 +64,7 @@ def print_help() -> None:
         "  /config set key value Set config value\n"
         "  /config interactive   Prompt for config values\n"
         "  /save [filename]      Save the last answer to a file\n"
-        "  /history [N]          Show last N queries\n"
-        "\nSearch providers:\n"
-        "  search_provider=bing_web      Use Bing Web Search v7 + Azure OpenAI\n"
-        "  search_provider=grounding     Use AI Foundry Grounding with Bing"
+        "  /history [N]          Show last N queries"
     )
 
 
@@ -92,13 +83,6 @@ def prompt_config_interactive(config: Config) -> Config:
     print("Enter values (leave blank to keep current):")
     updates: Dict[str, str] = {}
     for field in [
-        "bing_api_key",
-        "bing_endpoint",
-        "search_provider",
-        "azure_openai_endpoint",
-        "azure_openai_api_version",
-        "azure_openai_deployment",
-        "azure_openai_api_key",
         "ai_project_endpoint",
         "ai_project_connection_id",
         "ai_project_model_deployment",
@@ -164,50 +148,18 @@ def show_history(limit: int) -> None:
 
 def run_query(query: str, config: Config) -> str:
     start_total = time.perf_counter()
-    provider = (config.search_provider or "bing_web").lower()
-    if provider == "grounding":
-        answer, trace_info = grounding_answer(query, config)
-        answer = _guard_ticker_answer(query, answer)
-        append_history(
-            {
-                "timestamp": now_iso(),
-                "query": query,
-                "answer": answer,
-                "provider": "grounding",
-            }
-        )
-        if config.trace_enabled and trace_info:
-            total_ms = (time.perf_counter() - start_total) * 1000
-            _print_trace({**trace_info, "total_ms": total_ms})
-        return answer
-
-    start_search = time.perf_counter()
-    _print_status("Searching...")
-    results = search_web(query, config)
-    search_ms = (time.perf_counter() - start_search) * 1000
-
-    start_summary = time.perf_counter()
-    _print_status("Summarizing...")
-    answer = summarize(query, results, config)
-    summary_ms = (time.perf_counter() - start_summary) * 1000
+    answer, trace_info = grounding_answer(query, config)
+    answer = _guard_ticker_answer(query, answer)
     append_history(
         {
             "timestamp": now_iso(),
             "query": query,
             "answer": answer,
-            "results": results,
-            "provider": "bing_web",
         }
     )
-    if config.trace_enabled:
+    if config.trace_enabled and trace_info:
         total_ms = (time.perf_counter() - start_total) * 1000
-        _print_trace(
-            {
-                "search_ms": search_ms,
-                "summary_ms": summary_ms,
-                "total_ms": total_ms,
-            }
-        )
+        _print_trace({**trace_info, "total_ms": total_ms})
     return answer
 
 
@@ -240,8 +192,6 @@ def _print_trace(metrics: Dict[str, float]) -> None:
         "agent_create_ms",
         "openai_client_init_ms",
         "first_chunk_ms",
-        "search_ms",
-        "summary_ms",
         "request_ms",
         "total_ms",
     ]
@@ -344,26 +294,25 @@ def main() -> None:
     setup_logging(config.log_level, config.sdk_log_level)
     print_banner(config)
 
-    if (config.search_provider or "bing_web").lower() == "grounding":
-        def _background_warmup() -> None:
-            try:
-                from .grounding import prewarm, warmup_request
+    def _background_warmup() -> None:
+        try:
+            from .grounding import prewarm, warmup_request
 
-                if config.prewarm_enabled:
-                    trace = prewarm(config)
-                    if config.trace_enabled and trace:
-                        _print_trace(trace)
-                if config.warmup_enabled:
-                    if config.warmup_delay_ms > 0:
-                        _time.sleep(config.warmup_delay_ms / 1000)
-                    trace = warmup_request(config)
-                    if config.trace_enabled and trace:
-                        _print_trace({"warmup": 1, **trace})
-            except Exception as exc:  # noqa: BLE001
-                logging.getLogger(__name__).debug("Warmup failed: %s", exc)
+            if config.prewarm_enabled:
+                trace = prewarm(config)
+                if config.trace_enabled and trace:
+                    _print_trace(trace)
+            if config.warmup_enabled:
+                if config.warmup_delay_ms > 0:
+                    _time.sleep(config.warmup_delay_ms / 1000)
+                trace = warmup_request(config)
+                if config.trace_enabled and trace:
+                    _print_trace({"warmup": 1, **trace})
+        except Exception as exc:  # noqa: BLE001
+            logging.getLogger(__name__).debug("Warmup failed: %s", exc)
 
-        if config.prewarm_enabled or config.warmup_enabled:
-            threading.Thread(target=_background_warmup, daemon=True).start()
+    if config.prewarm_enabled or config.warmup_enabled:
+        threading.Thread(target=_background_warmup, daemon=True).start()
 
     if args.help:
         print_help()
@@ -372,7 +321,7 @@ def main() -> None:
     if args.query:
         try:
             start_total = time.perf_counter()
-            if config.streaming_enabled and (config.search_provider or "bing_web").lower() == "grounding" and not _has_ticker(args.query):
+            if config.streaming_enabled and not _has_ticker(args.query):
                 from .grounding import grounding_stream
 
                 _print_status("Searching...")
@@ -394,7 +343,7 @@ def main() -> None:
             else:
                 answer = run_query(args.query, config)
                 print("\n" + format_answer(answer) + "\n")
-        except (BingSearchError, SummaryError, GroundingError) as exc:
+        except GroundingError as exc:
             logging.getLogger(__name__).error("%s", exc)
         except Exception as exc:  # noqa: BLE001
             logger = logging.getLogger(__name__)
@@ -445,7 +394,7 @@ def main() -> None:
 
         try:
             start_total = time.perf_counter()
-            if config.streaming_enabled and (config.search_provider or "bing_web").lower() == "grounding" and not _has_ticker(line):
+            if config.streaming_enabled and not _has_ticker(line):
                 from .grounding import grounding_stream
 
                 _print_status("Searching...")
@@ -471,7 +420,7 @@ def main() -> None:
                 last_answer = answer
         except KeyboardInterrupt:
             print("\nCancelled.\n")
-        except (BingSearchError, SummaryError, GroundingError) as exc:
+        except GroundingError as exc:
             logging.getLogger(__name__).error("%s", exc)
         except Exception as exc:  # noqa: BLE001
             logger = logging.getLogger(__name__)
